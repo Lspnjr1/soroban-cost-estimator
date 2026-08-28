@@ -2,9 +2,11 @@
 **/*.rs.bk
 *.swp
 *.swo
+temp_auto_push.bat
 .DS_Store
-.vscode/
 .idea/
 *.wasm
 !tests/fixtures/*.wasm
 
+.gitignore
+branch_structure.json

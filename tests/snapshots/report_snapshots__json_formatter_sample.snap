@@ -5,6 +5,12 @@ expression: JsonFormatter.format(&report)
 {
   "function": "increment",
   "wasm_hash": "abc123def456",
+  "wasm_size": 7312,
+  "section_count": 9,
+  "custom_sections": [
+    "contractspecv0",
+    "name"
+  ],
   "cpu_instructions": 532502,
   "memory_bytes": 0,
   "tx_size": 156,

@@ -22,10 +22,9 @@
 
 # Soroban Cost Estimator
 
-[📚 Documentation](https://soroban-cost-estimator.gitbook.io/soroban-cost_estimator-docs) · [🔄 Migration Guide](docs/migration.md)
+[📚 Documentation](https://soroban-cost-estimator.gitbook.io/soroban-cost_estimator-docs)
 
 **Estimate Soroban contract resource costs & track network pricing changes over time.**
-
 
 This CLI tool wraps Stellar's `simulateTransaction` RPC to report real resource
 consumption (CPU instructions, memory, read/write entries/bytes, tx size, rent)

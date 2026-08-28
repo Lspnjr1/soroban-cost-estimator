@@ -40,7 +40,12 @@ impl ReportFormatter for TableFormatter {
             "Network: {} (ledger {})\n",
             report.network, report.ledger
         ));
-        output.push_str(&format!("WASM hash: {}\n\n", report.wasm_hash));
+        output.push_str(&format!("WASM hash:  {}\n", report.wasm_hash));
+        output.push_str(&format!("WASM size:  {} bytes\n", report.wasm_size));
+        output.push_str(&format!(
+            "Sections:   {}\n\n",
+            crate::report::cost_report::format_section_summary(report)
+        ));
 
         let mut table = comfy_table::Table::new();
         table.set_header(vec!["Resource", "Consumed", "Fee (stroops)"]);
@@ -117,9 +122,10 @@ pub struct CsvFormatter;
 impl ReportFormatter for CsvFormatter {
     fn format(&self, report: &CostReport) -> String {
         let mut output = String::from(
-            "function,network,ledger,wasm_hash,cpu_instructions,memory_bytes,\
-             read_entries,write_entries,read_bytes,write_bytes,tx_size,\
-             non_refundable_stroops,refundable_stroops,total_stroops,total_xlm\n",
+            "function,network,ledger,wasm_hash,wasm_size,section_count,custom_sections,\
+             cpu_instructions,memory_bytes,read_entries,write_entries,read_bytes,\
+             write_bytes,tx_size,non_refundable_stroops,refundable_stroops,total_stroops,\
+             total_xlm\n",
         );
 
         let row = csv_row(&[
@@ -127,6 +133,9 @@ impl ReportFormatter for CsvFormatter {
             &report.network,
             &report.ledger.to_string(),
             &report.wasm_hash,
+            &report.wasm_size.to_string(),
+            &report.section_count.to_string(),
+            &report.custom_sections.join(";"),
             &report.cpu_instructions.to_string(),
             &report.memory_bytes.to_string(),
             &report.read_entries.to_string(),
@@ -171,7 +180,12 @@ impl ReportFormatter for MarkdownFormatter {
             "- **Network:** {} (ledger {})\n",
             report.network, report.ledger
         ));
-        output.push_str(&format!("- **WASM hash:** `{}`\n\n", report.wasm_hash));
+        output.push_str(&format!("- **WASM hash:** `{}`\n", report.wasm_hash));
+        output.push_str(&format!("- **WASM size:** {} bytes\n", report.wasm_size));
+        output.push_str(&format!(
+            "- **Sections:** {}\n\n",
+            crate::report::cost_report::format_section_summary(report)
+        ));
 
         // Resource table
         output.push_str("### Resources\n\n");
@@ -264,6 +278,9 @@ mod tests {
         CostReport {
             function: "increment".to_string(),
             wasm_hash: "abc123def456".to_string(),
+            wasm_size: 7_312,
+            section_count: 9,
+            custom_sections: vec!["contractspecv0".to_string(), "name".to_string()],
             cpu_instructions: 532_502,
             memory_bytes: 0,
             tx_size: 156,
@@ -286,6 +303,9 @@ mod tests {
         CostReport {
             function: "(wasm upload)".to_string(),
             wasm_hash: "0000000000000000".to_string(),
+            wasm_size: 0,
+            section_count: 0,
+            custom_sections: vec![],
             cpu_instructions: 0,
             memory_bytes: 0,
             tx_size: 0,
@@ -403,7 +423,7 @@ mod tests {
         let first_line = output.lines().next().unwrap();
         assert!(first_line.starts_with("function,"));
         let field_count = first_line.split(',').count();
-        assert_eq!(field_count, 15);
+        assert_eq!(field_count, 18);
     }
 
     #[test]

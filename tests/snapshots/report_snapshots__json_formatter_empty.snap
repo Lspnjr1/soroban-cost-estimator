@@ -5,6 +5,9 @@ expression: JsonFormatter.format(&empty)
 {
   "function": "(wasm upload)",
   "wasm_hash": "0000000000000000",
+  "wasm_size": 0,
+  "section_count": 0,
+  "custom_sections": [],
   "cpu_instructions": 0,
   "memory_bytes": 0,
   "tx_size": 0,

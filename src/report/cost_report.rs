@@ -9,6 +9,12 @@ pub struct CostReport {
     pub function: String,
     /// WASM bytes SHA-256 hash (hex).
     pub wasm_hash: String,
+    /// WASM binary size in bytes.
+    pub wasm_size: u64,
+    /// Total number of sections in the WASM module.
+    pub section_count: u32,
+    /// Names of the WASM custom sections (e.g. `contractspecv0`, `name`).
+    pub custom_sections: Vec<String>,
     /// CPU instructions consumed.
     pub cpu_instructions: u64,
     /// Memory bytes used.
@@ -40,7 +46,12 @@ pub fn format_report_table(report: &CostReport) -> String {
         "Network: {} (ledger {})\n",
         report.network, report.ledger
     ));
-    output.push_str(&format!("WASM hash: {}\n\n", report.wasm_hash));
+    output.push_str(&format!("WASM hash:  {}\n", report.wasm_hash));
+    output.push_str(&format!("WASM size:  {} bytes\n", report.wasm_size));
+    output.push_str(&format!(
+        "Sections:   {}\n\n",
+        format_section_summary(report)
+    ));
 
     let mut table = Table::new();
 
@@ -81,4 +92,19 @@ pub fn format_report_table(report: &CostReport) -> String {
 /// Formats a cost report as a JSON string.
 pub fn format_report_json(report: &CostReport) -> String {
     serde_json::to_string_pretty(report).unwrap_or_else(|_| "{}".to_string())
+}
+
+/// Formats a report's section summary as `N (custom: a, b)` or
+/// `N (custom: none)` when the module has no custom sections.
+#[must_use]
+pub fn format_section_summary(report: &CostReport) -> String {
+    if report.custom_sections.is_empty() {
+        format!("{} (custom: none)", report.section_count)
+    } else {
+        format!(
+            "{} (custom: {})",
+            report.section_count,
+            report.custom_sections.join(", ")
+        )
+    }
 }

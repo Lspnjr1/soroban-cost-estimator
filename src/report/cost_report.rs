@@ -126,6 +126,19 @@ pub fn format_report_json(report: &CostReport) -> String {
     serde_json::to_string_pretty(report).unwrap_or_else(|_| "{}".to_string())
 }
 
+#[must_use]
+pub fn format_section_summary(report: &CostReport) -> String {
+    if report.custom_sections.is_empty() {
+        format!("{} (custom: none)", report.section_count)
+    } else {
+        format!(
+            "{} (custom: {})",
+            report.section_count,
+            report.custom_sections.join(", ")
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

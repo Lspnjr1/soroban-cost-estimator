@@ -7,11 +7,14 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 use tracing::{debug, trace, warn};
 
 use crate::error::{AppError, AppResult};
+
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// Current cache-entry schema version.
 ///
@@ -130,7 +133,19 @@ pub fn save_estimate(
     };
 
     let json = serde_json::to_string_pretty(&cached)?;
-    std::fs::write(&path, json)?;
+    // Write to a unique sibling and rename it into place. A direct write can
+    // truncate the shared entry while another process is reading it, leaving
+    // partially-written JSON behind.
+    let temp_path = dir.join(format!(
+        ".{filename}.{}.{}.tmp",
+        std::process::id(),
+        TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    std::fs::write(&temp_path, json)?;
+    if let Err(error) = std::fs::rename(&temp_path, &path) {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(error.into());
+    }
     debug!(path = %path.display(), function, network, ledger, "estimate cached");
     Ok(())
 }

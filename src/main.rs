@@ -64,9 +64,11 @@ async fn run(args: cli::Cli) -> error::AppResult<()> {
             cli::ConfigAction::Snapshot { network, out, json } => {
                 cmd_config_snapshot(&network, out.as_deref(), json).await
             }
-            cli::ConfigAction::Diff { network, against } => {
-                cmd_config_diff(&network, against.as_deref()).await
-            }
+            cli::ConfigAction::Diff {
+                network,
+                against,
+                summary,
+            } => cmd_config_diff(&network, against.as_deref(), summary).await,
             cli::ConfigAction::History { network } => cmd_config_history(&network),
             cli::ConfigAction::LastChanged { network } => cmd_config_last_changed(&network),
             cli::ConfigAction::Validate { network } => cmd_config_validate(&network),
@@ -724,7 +726,11 @@ fn upgrade_detected(diff: &config_snapshot::diff::ConfigDiff) -> bool {
 }
 
 /// `config diff` command: compare current config against a snapshot.
-async fn cmd_config_diff(network: &str, against_path: Option<&str>) -> error::AppResult<()> {
+async fn cmd_config_diff(
+    network: &str,
+    against_path: Option<&str>,
+    summary: bool,
+) -> error::AppResult<()> {
     use tracing::Instrument;
     use tracing::{debug, info_span};
 
@@ -749,7 +755,11 @@ async fn cmd_config_diff(network: &str, against_path: Option<&str>) -> error::Ap
             has_pricing = diff.has_pricing_changes,
             "diff computed"
         );
-        println!("{}", config_snapshot::diff::format_diff(&diff));
+        if summary {
+            println!("{}", config_snapshot::diff::format_diff_summary(&diff));
+        } else {
+            println!("{}", config_snapshot::diff::format_diff(&diff));
+        }
 
         if upgrade_detected(&diff) {
             match config_snapshot::store::save_snapshot(&new_snapshot, None) {

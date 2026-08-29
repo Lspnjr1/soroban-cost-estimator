@@ -59,6 +59,7 @@ async fn run(args: cli::Cli) -> error::AppResult<()> {
             id,
             json,
         } => cmd_estimate_all(&wasm, &network, id.as_deref(), json).await,
+        cli::Command::WasmInfo { wasm, json } => cmd_wasm_info(&wasm, json),
         cli::Command::Config { action } => match action {
             cli::ConfigAction::Snapshot { network, out, json } => {
                 cmd_config_snapshot(&network, out.as_deref(), json).await
@@ -81,6 +82,53 @@ async fn run(args: cli::Cli) -> error::AppResult<()> {
         },
         cli::Command::Watch { network, interval } => cmd_watch(&network, &interval).await,
     }
+}
+
+/// Prints local WASM metadata without making an RPC request.
+fn cmd_wasm_info(wasm_path: &str, json_flag: bool) -> error::AppResult<()> {
+    use sha2::Digest;
+
+    let info = wasm::parser::load_wasm(std::path::Path::new(wasm_path))?;
+    let hash = hex::encode(sha2::Sha256::digest(&info.bytes));
+    if json_flag {
+        println!(
+            "{}",
+            serde_json::json!({
+                "path": wasm_path,
+                "size": info.bytes.len(),
+                "sha256": hash,
+                "has_spec": info.has_spec,
+                "contract_meta": {
+                    "name": info.contract_meta.name,
+                    "version": info.contract_meta.version,
+                    "description": info.contract_meta.description,
+                    "entries": info.contract_meta.entries.iter().map(|(key, value)| serde_json::json!({"key": key, "value": value})).collect::<Vec<_>>(),
+                },
+                "functions": info.functions.iter().map(|f| serde_json::json!({"name": f.name, "param_count": f.param_count, "result_count": f.result_count})).collect::<Vec<_>>(),
+            })
+        );
+    } else {
+        println!("WASM info: {wasm_path}");
+        println!("  Size:      {} bytes", info.bytes.len());
+        println!("  SHA-256:   {hash}");
+        println!("  Functions: {}", info.functions.len());
+        for (index, function) in info.functions.iter().enumerate() {
+            println!(
+                "    [{}] {}",
+                index + 1,
+                wasm::parser::format_function(function)
+            );
+        }
+        println!(
+            "  Contract spec: {}",
+            if info.has_spec { "present" } else { "absent" }
+        );
+        println!(
+            "{}",
+            wasm::parser::format_contract_meta(&info.contract_meta)
+        );
+    }
+    Ok(())
 }
 
 /// True when a simulation response carried neither cost data, nor

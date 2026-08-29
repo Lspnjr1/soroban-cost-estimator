@@ -74,6 +74,14 @@ pub enum Command {
         json: bool,
     },
 
+    /// Print WASM metadata without making any RPC calls.
+    WasmInfo {
+        #[arg(long, short)]
+        wasm: String,
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Fetch and store a snapshot of the network's resource-pricing configuration.
     Config {
         #[command(subcommand)]

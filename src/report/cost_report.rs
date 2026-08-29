@@ -1,6 +1,6 @@
 use comfy_table::Table;
 
-use crate::report::fee_calc::FeeBreakdown;
+use crate::report::fee_calc::{FeeBreakdown, FeeRates};
 
 /// Compute what percentage `part` is of `total`.
 ///
@@ -48,6 +48,11 @@ pub struct CostReport {
     pub ledger: u32,
     /// Network the simulation ran on.
     pub network: String,
+    /// RPC round-trip time of the simulation call, in milliseconds.
+    pub rpc_latency_ms: u64,
+    /// Fee rates captured at simulation time for optimization suggestions.
+    #[serde(skip)]
+    pub rates: Option<FeeRates>,
 }
 
 /// Formats a cost report as a human-readable table.

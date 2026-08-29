@@ -150,6 +150,60 @@ pub fn save_estimate(
     Ok(())
 }
 
+/// Return the total size of JSON cache entries.
+pub fn cache_size_bytes() -> AppResult<u64> {
+    let dir = cache_dir()?;
+    if !dir.exists() {
+        return Ok(0);
+    }
+    Ok(std::fs::read_dir(dir)?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            (entry.path().extension().and_then(|ext| ext.to_str()) == Some("json"))
+                .then(|| entry.metadata().ok().map(|metadata| metadata.len()))
+                .flatten()
+        })
+        .sum())
+}
+
+/// Evict oldest JSON cache entries until the cache is within `limit_bytes`.
+pub fn evict_lru_entries(limit_bytes: u64, protected: Option<&Path>) -> AppResult<usize> {
+    let dir = cache_dir()?;
+    if !dir.exists() {
+        return Ok(0);
+    }
+    let mut entries = Vec::new();
+    let mut total = 0_u64;
+    for entry in std::fs::read_dir(&dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+            let metadata = entry.metadata()?;
+            total = total.saturating_add(metadata.len());
+            entries.push((
+                metadata.modified().unwrap_or(std::time::UNIX_EPOCH),
+                metadata.len(),
+                path,
+            ));
+        }
+    }
+    entries.sort_by_key(|entry| entry.0);
+    let mut evicted = 0;
+    for (_, size, path) in entries {
+        if total <= limit_bytes {
+            break;
+        }
+        if protected.is_some_and(|protected| protected == path) {
+            continue;
+        }
+        std::fs::remove_file(&path)?;
+        total = total.saturating_sub(size);
+        evicted += 1;
+        trace!(path = %path.display(), "evicted LRU cache entry");
+    }
+    Ok(evicted)
+}
+
 /// Carry a cached estimate forward to the current schema version.
 ///
 /// * `version < CACHE_SCHEMA_VERSION`: entries from older schemas are

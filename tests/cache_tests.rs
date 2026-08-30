@@ -1001,6 +1001,16 @@ fn test_verify_cache_accepts_legacy_entries() {
 fn test_concurrent_same_key_saves_leave_valid_entry() {
     with_temp_home(|_tmp| {
         let args = vec!["shared".to_string()];
+
+        // Warm up the database so the WAL/journal setup and table creation
+        // complete before the writer threads start; otherwise all threads race
+        // the `PRAGMA journal_mode=WAL` switch on a fresh file and some can
+        // fail with SQLITE_BUSY before their busy_timeout is installed.
+        // Use the same key the writer threads upsert so the entry-count
+        // assertion below still sees exactly one row for the shared key.
+        cache::save_estimate("shared-hash", "shared-func", &args, "testnet", 0, 0, 0, 0)
+            .expect("warmup save");
+
         let handles: Vec<_> = (0..CONCURRENT_THREADS)
             .map(|t| {
                 let args = args.clone();

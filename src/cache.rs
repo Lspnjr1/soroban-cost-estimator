@@ -114,8 +114,12 @@ pub fn ensure_cache_schema(conn: &Connection) -> AppResult<()> {
     // WAL lets concurrent readers and writers coexist, and busy_timeout makes
     // contending writers wait instead of failing with SQLITE_BUSY.
     conn.execute_batch(
-        "PRAGMA journal_mode=WAL; \
-         PRAGMA busy_timeout=5000; \
+        // Set busy_timeout before journal_mode: switching a fresh database to
+        // WAL takes an exclusive lock, and a second connection racing the
+        // switch would otherwise fail with SQLITE_BUSY before its busy
+        // handler is installed.
+        "PRAGMA busy_timeout=5000; \
+         PRAGMA journal_mode=WAL; \
          CREATE TABLE IF NOT EXISTS estimates (
             version          INTEGER NOT NULL,
             wasm_hash        TEXT NOT NULL,

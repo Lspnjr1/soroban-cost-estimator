@@ -536,6 +536,13 @@ fn test_verify_cache_across_networks_all_valid() {
 #[test]
 fn test_concurrent_cross_network_same_key_no_corruption() {
     with_temp_home(|_tmp| {
+        // Warm up the database so the WAL/journal setup and table creation
+        // complete before the writer threads start; otherwise both threads
+        // race the `PRAGMA journal_mode=WAL` switch on a fresh file and one
+        // can fail with SQLITE_BUSY before its busy_timeout is installed.
+        cache::save_estimate("warmup-hash", "warmup-func", &[], "testnet", 0, 0, 0, 0)
+            .expect("warmup save");
+
         let args = vec!["shared".to_string()];
         let tn_args = args.clone();
         let mn_args = args.clone();

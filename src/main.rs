@@ -1544,6 +1544,11 @@ mod tests {
     fn test_wasm_info_json_structure() {
         let info = WasmInfo {
             bytes: vec![0u8; 44],
+            size: 44,
+            sections: SectionInfo {
+                count: 0,
+                custom_names: Vec::new(),
+            },
             has_spec: true,
             contract_meta: ContractMeta::default(),
             functions: vec![FunctionInfo {

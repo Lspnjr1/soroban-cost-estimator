@@ -1428,7 +1428,9 @@ mod tests {
     use soroban_cost_estimator::config_snapshot::model::{
         ConfigSnapshot, ContractComputeV0, ContractLedgerCostV0,
     };
-    use soroban_cost_estimator::wasm::parser::{ContractMeta, FunctionInfo, ParamInfo, WasmInfo};
+    use soroban_cost_estimator::wasm::parser::{
+        ContractMeta, FunctionInfo, ParamInfo, SectionInfo, WasmInfo,
+    };
 
     fn snapshot_with_compute_fee(fee: i64) -> ConfigSnapshot {
         ConfigSnapshot {

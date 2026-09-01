@@ -5,6 +5,7 @@ expression: MarkdownFormatter.format(&empty)
 ## Cost Report: `(wasm upload)`
 
 - **Network:** mainnet (ledger 0)
+- **RPC round-trip:** 0 ms
 - **WASM hash:** `0000000000000000`
 - **WASM size:** 0 bytes
 - **Sections:** 0 (custom: none)
@@ -31,3 +32,7 @@ expression: MarkdownFormatter.format(&empty)
 | Storage | 0 | 0.0% |
 | Bandwidth | 0 | 0.0% |
 | **Total** | **0** (0.0000000) | **100.0%** |
+
+### Optimization Suggestions
+
+No cost optimizations identified (fee rates unavailable or no reducible resources).

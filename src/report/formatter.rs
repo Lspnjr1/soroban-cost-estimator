@@ -40,6 +40,7 @@ impl ReportFormatter for TableFormatter {
             "Network: {} (ledger {})\n",
             report.network, report.ledger
         ));
+        output.push_str(&format!("RPC round-trip: {} ms\n", report.rpc_latency_ms));
         output.push_str(&format!("WASM hash:  {}\n", report.wasm_hash));
         output.push_str(&format!("WASM size:  {} bytes\n", report.wasm_size));
         output.push_str(&format!(
@@ -98,6 +99,11 @@ impl ReportFormatter for TableFormatter {
             report.fee.total_stroops, report.fee.total_xlm,
         ));
 
+        output.push('\n');
+        output.push_str(&crate::report::cost_report::format_suggestions(
+            &report.suggest_optimizations(),
+        ));
+
         output
     }
 
@@ -117,7 +123,13 @@ pub struct JsonFormatter;
 
 impl ReportFormatter for JsonFormatter {
     fn format(&self, report: &CostReport) -> String {
-        serde_json::to_string_pretty(report).unwrap_or_else(|_| "{}".to_string())
+        let mut value = serde_json::to_value(report).unwrap_or(serde_json::Value::Null);
+        let suggestions =
+            serde_json::to_value(report.suggest_optimizations()).unwrap_or(serde_json::Value::Null);
+        if let serde_json::Value::Object(ref mut map) = value {
+            map.insert("suggestions".to_string(), suggestions);
+        }
+        serde_json::to_string_pretty(&value).unwrap_or_else(|_| "{}".to_string())
     }
 
     fn name(&self) -> &'static str {
@@ -144,7 +156,7 @@ impl ReportFormatter for CsvFormatter {
             "function,network,ledger,wasm_hash,wasm_size,section_count,custom_sections,\
              cpu_instructions,memory_bytes,read_entries,write_entries,read_bytes,\
              write_bytes,tx_size,non_refundable_stroops,refundable_stroops,total_stroops,\
-             total_xlm\n",
+             total_xlm,rpc_latency_ms\n",
         );
 
         let row = csv_row(&[
@@ -166,6 +178,7 @@ impl ReportFormatter for CsvFormatter {
             &report.fee.refundable_stroops.to_string(),
             &report.fee.total_stroops.to_string(),
             &report.fee.total_xlm,
+            &report.rpc_latency_ms.to_string(),
         ]);
         output.push_str(&row);
         output.push('\n');
@@ -198,6 +211,10 @@ impl ReportFormatter for MarkdownFormatter {
         output.push_str(&format!(
             "- **Network:** {} (ledger {})\n",
             report.network, report.ledger
+        ));
+        output.push_str(&format!(
+            "- **RPC round-trip:** {} ms\n",
+            report.rpc_latency_ms
         ));
         output.push_str(&format!("- **WASM hash:** `{}`\n", report.wasm_hash));
         output.push_str(&format!("- **WASM size:** {} bytes\n", report.wasm_size));
@@ -256,6 +273,22 @@ impl ReportFormatter for MarkdownFormatter {
             "| **Total** | **{}** ({}) | **100.0%** |\n",
             report.fee.total_stroops, report.fee.total_xlm,
         ));
+
+        // Optimization suggestions
+        output.push_str("\n### Optimization Suggestions\n\n");
+        let suggestions = report.suggest_optimizations();
+        if suggestions.is_empty() {
+            output.push_str(
+                "No cost optimizations identified (fee rates unavailable or no reducible resources).\n",
+            );
+        } else {
+            for s in &suggestions {
+                output.push_str(&format!(
+                    "- **{}**: {} (potential saving: {} stroops)\n",
+                    s.title, s.detail, s.potential_savings_stroops
+                ));
+            }
+        }
 
         output
     }
@@ -337,7 +370,7 @@ mod tests {
             },
             ledger: 3_894_195,
             network: "testnet".to_string(),
-            rpc_latency_ms: 0,
+            rpc_latency_ms: 87,
             rates: None,
         }
     }
@@ -390,6 +423,21 @@ mod tests {
     }
 
     #[test]
+    fn test_table_formatter_contains_rpc_latency() {
+        let formatter = TableFormatter;
+        let output = formatter.format(&sample_report());
+        assert!(output.contains("RPC round-trip: 87 ms"));
+    }
+
+    #[test]
+    fn test_table_formatter_contains_wasm_sections() {
+        let formatter = TableFormatter;
+        let output = formatter.format(&sample_report());
+        assert!(output.contains("WASM size:  7312 bytes"));
+        assert!(output.contains("Sections:   9 (custom: contractspecv0, name)"));
+    }
+
+    #[test]
     fn test_table_formatter_contains_fee_breakdown() {
         let formatter = TableFormatter;
         let output = formatter.format(&sample_report());
@@ -434,8 +482,12 @@ mod tests {
         let output = formatter.format(&sample_report());
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(parsed["wasm_hash"], "abc123def456");
+        assert_eq!(parsed["wasm_size"], 7_312);
+        assert_eq!(parsed["section_count"], 9);
+        assert_eq!(parsed["custom_sections"][0], "contractspecv0");
         assert_eq!(parsed["ledger"], 3_894_195);
         assert_eq!(parsed["network"], "testnet");
+        assert_eq!(parsed["rpc_latency_ms"], 87);
         assert_eq!(parsed["fee"]["total_stroops"], 15_427);
         assert_eq!(parsed["fee"]["total_xlm"], "0.0015427");
     }
@@ -471,7 +523,7 @@ mod tests {
         let first_line = output.lines().next().unwrap();
         assert!(first_line.starts_with("function,"));
         let field_count = first_line.split(',').count();
-        assert_eq!(field_count, 18);
+        assert_eq!(field_count, 19);
     }
 
     #[test]
@@ -483,6 +535,7 @@ mod tests {
         let data = lines[1];
         assert!(data.contains("increment"));
         assert!(data.contains("testnet"));
+        assert!(data.contains("7312"));
         assert!(data.contains("532502"));
         assert!(data.contains("15427"));
     }
@@ -568,6 +621,9 @@ mod tests {
         let output = formatter.format(&sample_report());
         assert!(output.contains("**Network:** testnet (ledger 3894195)"));
         assert!(output.contains("**WASM hash:** `abc123def456`"));
+        assert!(output.contains("**RPC round-trip:** 87 ms"));
+        assert!(output.contains("**WASM size:** 7312 bytes"));
+        assert!(output.contains("**Sections:** 9 (custom: contractspecv0, name)"));
     }
 
     #[test]
